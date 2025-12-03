@@ -7,7 +7,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import process_cvs
 
 app = FastAPI(root_path="/api")
 
@@ -33,6 +32,9 @@ class AnalysisRequest(BaseModel):
 @app.post("/analyze")
 async def analyze_cvs(request: AnalysisRequest):
     try:
+        # Import here to avoid crashing at startup if Supabase env vars are missing
+        import process_cvs
+        
         # In a real app, we might want to filter by job_id if provided,
         # but process_cvs currently processes all open jobs.
         # We can modify process_cvs to accept arguments later if needed.
