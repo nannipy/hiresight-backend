@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 import google.generativeai as genai
 from openai import OpenAI
-import ollama
+
 
 class LLMProvider(ABC):
     @abstractmethod
@@ -48,30 +48,30 @@ class OpenAIProvider(LLMProvider):
             print(f"Error generating content with OpenAI: {e}")
             return {}
 
-class OllamaProvider(LLMProvider):
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+# class OllamaProvider(LLMProvider):
+#     def __init__(self, model_name: str):
+#         self.model_name = model_name
 
-    def generate_analysis(self, prompt: str) -> dict:
-        try:
-            response = ollama.chat(model=self.model_name, messages=[
-                {
-                    'role': 'user',
-                    'content': prompt,
-                },
-            ])
-            # Attempt to parse JSON from the response
-            content = response['message']['content']
-            # Find JSON block if wrapped in markdown
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                 content = content.split("```")[1].split("```")[0].strip()
+#     def generate_analysis(self, prompt: str) -> dict:
+#         try:
+#             response = ollama.chat(model=self.model_name, messages=[
+#                 {
+#                     'role': 'user',
+#                     'content': prompt,
+#                 },
+#             ])
+#             # Attempt to parse JSON from the response
+#             content = response['message']['content']
+#             # Find JSON block if wrapped in markdown
+#             if "```json" in content:
+#                 content = content.split("```json")[1].split("```")[0].strip()
+#             elif "```" in content:
+#                  content = content.split("```")[1].split("```")[0].strip()
             
-            return json.loads(content)
-        except Exception as e:
-            print(f"Error generating content with Ollama: {e}")
-            return {}
+#             return json.loads(content)
+#         except Exception as e:
+#             print(f"Error generating content with Ollama: {e}")
+#             return {}
 
 class LLMFactory:
     @staticmethod
@@ -91,8 +91,6 @@ class LLMFactory:
                 raise ValueError("OPENAI_API_KEY not found in environment variables")
             return OpenAIProvider(model_name, api_key)
             
-        elif provider_type == "ollama":
-            return OllamaProvider(model_name)
-            
+     
         else:
             raise ValueError(f"Unsupported provider: {provider_type}")
