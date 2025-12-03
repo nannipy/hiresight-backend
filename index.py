@@ -15,6 +15,7 @@ app = FastAPI(root_path="/api")
 origins = [
     "http://localhost:8080",  # Vite default port
     "http://127.0.0.1:8080",
+    "https://hiresight-ce868112e8e9.herokuapp.com/"
 ]
 
 app.add_middleware(
