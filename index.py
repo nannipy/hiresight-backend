@@ -4,7 +4,7 @@ import sys
 # Add current directory to sys.path to allow importing sibling modules in Vercel
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -30,22 +30,17 @@ class AnalysisRequest(BaseModel):
     job_id: str | None = None
 
 @app.post("/analyze")
-async def analyze_cvs(request: AnalysisRequest):
+async def analyze_cvs(request: AnalysisRequest, background_tasks: BackgroundTasks):
     try:
         # Import here to avoid crashing at startup if Supabase env vars are missing
         import process_cvs
         
-        # In a real app, we might want to filter by job_id if provided,
-        # but process_cvs currently processes all open jobs.
-        # We can modify process_cvs to accept arguments later if needed.
+        # Run analysis in the background
+        background_tasks.add_task(process_cvs.process_cvs, request.job_id)
         
-        # Capture output? For now just run it.
-        # Note: This is a blocking call. For production, use background tasks.
-        process_cvs.process_cvs()
-        
-        return {"message": "Analysis completed successfully", "status": "success"}
+        return {"message": "Analysis started in background", "status": "processing"}
     except Exception as e:
-        print(f"Error during analysis: {e}")
+        print(f"Error starting analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")

@@ -55,19 +55,28 @@ def extract_text_from_pdf(pdf_content):
         print(f"Error extracting text from PDF: {e}")
         return ""
 
-def process_cvs():
-    # 1. Fetch all open job postings
+def process_cvs(job_id: str = None):
+    # 1. Fetch job postings
     print("Fetching open job postings...")
-    jobs_response = supabase.from_("job_postings").select("*").eq("status", "open").execute()
+    jobs_query = supabase.from_("job_postings").select("*").eq("status", "open")
+    if job_id:
+        print(f"Filtering for job_id: {job_id}")
+        jobs_query = jobs_query.eq("id", job_id)
+        
+    jobs_response = jobs_query.execute()
     jobs = jobs_response.data
     
     if not jobs:
-        print("No open job postings found.")
+        print("No matching open job postings found.")
         return
 
-    print(f"Found {len(jobs)} open jobs.")
+    print(f"Found {len(jobs)} jobs to process.")
 
-    # 2. Fetch all candidates
+    # 2. Fetch candidates
+    # Optimization: If we have a job_id, we might only want to check candidates 
+    # who don't have a score for this job yet, or recent uploads.
+    # For now, we'll keep the logic simple but respect the job_id filter for evaluation.
+    
     print("Fetching candidates...")
     candidates_response = supabase.from_("candidates").select("*").execute()
     candidates = candidates_response.data
@@ -79,8 +88,6 @@ def process_cvs():
     print(f"Found {len(candidates)} candidates.")
 
     for candidate in candidates:
-        print(f"\nProcessing candidate: {candidate['full_name']} (ID: {candidate['id']})")
-        
         # 3. Determine jobs to evaluate
         # Fetch existing scores for this candidate to avoid re-work
         existing_scores_response = supabase.from_("candidate_scores").select("job_posting_id").eq("candidate_id", candidate['id']).execute()
@@ -92,15 +99,17 @@ def process_cvs():
         
         jobs_to_evaluate = []
         if name_needs_update or phone_needs_update:
-            # If info is missing, evaluate against ALL open jobs to ensure we get the info and fresh scores
+            # If info is missing, evaluate against ALL matched jobs to ensure we get the info and fresh scores
             jobs_to_evaluate = jobs
         else:
-            # Otherwise, only evaluate against new jobs
+            # Otherwise, only evaluate against new jobs (from the filtered list)
             jobs_to_evaluate = [j for j in jobs if j['id'] not in existing_job_ids]
 
         if not jobs_to_evaluate:
-            print("  - All jobs scored and info complete, skipping.")
+            # print(f"  - Candidate {candidate['id']} all up to date for target jobs.")
             continue
+            
+        print(f"\nProcessing candidate: {candidate['full_name']} (ID: {candidate['id']})")
 
         # 4. Download CV (only if needed)
         if not candidate.get("cv_file_url"):
@@ -112,7 +121,7 @@ def process_cvs():
             # URL format: .../storage/v1/object/public/cv-files/user_id/filename.pdf
             cv_path = candidate["cv_file_url"].split("/cv-files/")[-1]
             
-            print(f"  - Downloading CV: {cv_path}")
+            # print(f"  - Downloading CV: {cv_path}")
             cv_data = supabase.storage.from_("cv-files").download(cv_path)
             
             cv_text = extract_text_from_pdf(cv_data)
