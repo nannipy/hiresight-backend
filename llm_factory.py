@@ -17,16 +17,31 @@ class GoogleProvider(LLMProvider):
         self.model = genai.GenerativeModel(model_name)
 
     def generate_analysis(self, prompt: str) -> dict:
-        try:
-            # Add delay to avoid rate limits
-            time.sleep(2) 
-            response = self.model.generate_content(prompt)
-            # Clean up response text to ensure it's valid JSON
-            text = response.text.replace("```json", "").replace("```", "").strip()
-            return json.loads(text)
-        except Exception as e:
-            print(f"Error generating content with Google: {e}")
-            return {}
+        retries = 0
+        max_retries = 5
+        base_delay = 30  # Start with 30s as the logs showed ~26-30s wait times
+
+        while retries < max_retries:
+            try:
+                response = self.model.generate_content(prompt)
+                # Clean up response text to ensure it's valid JSON
+                text = response.text.replace("```json", "").replace("```", "").strip()
+                return json.loads(text)
+            except Exception as e:
+                # Check for rate limit error (ResourceExhausted)
+                # We interpret "429" or "ResourceExhausted" in the error string if we can't import the specific exception easily
+                error_str = str(e)
+                if "429" in error_str or "ResourceExhausted" in error_str or "Quota exceeded" in error_str:
+                    retries += 1
+                    delay = base_delay * (1.5 ** (retries - 1)) # 30, 45, 67, 100...
+                    print(f"Quota exceeded. Retrying in {int(delay)} seconds... (Attempt {retries}/{max_retries})")
+                    time.sleep(delay)
+                else:
+                    print(f"Error generating content with Google: {e}")
+                    return {}
+        
+        print("Max retries exceeded for Google LLM.")
+        return {}
 
 class OpenAIProvider(LLMProvider):
     def __init__(self, model_name: str, api_key: str):
